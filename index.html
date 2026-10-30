@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AETHOL — Demo Store</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f7f5f1; --ink:#141414; --muted:#6d6a66; --line:#e4e0d9;
+    --pink:#ff2d87; --orange:#ff8a00; --yellow:#ffd60a; --lime:#a6f23a; --cyan:#22d3ee; --violet:#8b5cf6;
+    --w:180px; --tick:36px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{font-family:"DM Sans",system-ui,sans-serif;background:var(--bg);color:var(--ink);padding-bottom:var(--tick);overflow-x:hidden}
+  body.lock{overflow:hidden}
+  button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+  h1,h2,h3,.display{font-family:"Bricolage Grotesque",system-ui,sans-serif}
+
+  /* ---------- header ---------- */
+  .top{position:sticky;top:0;z-index:30;display:flex;align-items:center;justify-content:space-between;padding:14px clamp(16px,4vw,40px);background:rgba(247,245,241,.85);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+  .logo{display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit}
+  .logo-word{font:800 26px/1 "Bricolage Grotesque",sans-serif;letter-spacing:.14em}
+  .logo-word::after{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--pink);margin-left:3px;vertical-align:top}
+  .demo-pill{font-size:10px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;border:1.5px solid var(--ink);border-radius:99px;padding:3px 8px}
+  .bag-btn{display:flex;align-items:center;gap:8px;font-weight:700;font-size:14px;padding:9px 14px;border-radius:99px;background:var(--ink);color:#fff;transition:transform .2s}
+  .bag-btn:hover{transform:translateY(-1px)}
+  .bag-count{min-width:22px;height:22px;border-radius:99px;background:var(--lime);color:var(--ink);display:grid;place-items:center;font-size:12px;padding:0 6px}
+  .bag-count.bump{animation:bump .5s}
+  @keyframes bump{30%{transform:scale(1.45)}60%{transform:scale(.9)}}
+
+  /* ---------- stage / rail ---------- */
+  .stage{position:relative;padding:8px 0 28px;text-align:center}
+  .eyebrow{font:700 12px/1 "DM Sans";letter-spacing:.22em;text-transform:uppercase;color:var(--muted);margin:10px 0 12px}
+  .stage h1{font-weight:800;font-size:clamp(30px,5.2vw,58px);line-height:1;letter-spacing:-.02em;margin:0 16px 18px}
+  .stage h1 em{font-style:normal;color:var(--pink)}
+  .tabs{display:inline-flex;gap:4px;padding:4px;border-radius:99px;background:#fff;border:1px solid var(--line)}
+  .tabs button{padding:8px 18px;border-radius:99px;font-weight:700;font-size:13px;letter-spacing:.04em;color:var(--muted);transition:background .25s,color .25s}
+  .tabs button.on{background:var(--ink);color:#fff}
+
+  .rail-wrap{position:relative;margin-top:26px;z-index:1;isolation:isolate}
+  .rail{overflow-x:auto;overflow-y:visible;scrollbar-width:none;cursor:grab;user-select:none;-webkit-user-select:none;padding-bottom:30px}
+  .rail::-webkit-scrollbar{display:none}
+  .rail.dragging{cursor:grabbing}
+  .track{position:relative;display:flex;align-items:flex-start;width:max-content;min-width:100%;justify-content:center;padding:10px 6vw 0}
+  .track::before{content:"";position:absolute;left:2vw;right:2vw;top:calc(10px + var(--w) * 1.5 * .027 - 3px);height:6px;border-radius:6px;
+    background:linear-gradient(180deg,#f4f4f4 0%,#b9bcc2 45%,#8a8e95 70%,#d6d8dc 100%);box-shadow:0 2px 3px rgba(0,0,0,.18)}
+  .hitem{position:relative;flex:0 0 auto;width:var(--w);height:calc(var(--w) * 1.5);margin-right:calc(var(--w) * -.6);z-index:var(--z,1);
+    transform:perspective(900px) translateX(var(--tx,0px)) rotateY(var(--ry,52deg)) scale(var(--sc,.96));transform-origin:50% 0;
+    transition:transform .65s cubic-bezier(.25,1.3,.4,1);
+    opacity:0;animation:slidein .8s cubic-bezier(.2,.85,.25,1) both;animation-delay:calc(var(--i) * 60ms)}
+  .hitem:last-child{margin-right:0}
+  .hitem .hsvg{transition:filter .4s}
+  .hitem:not(.act) .hsvg{filter:brightness(.9) saturate(.92)}
+  .hitem.act .hsvg{animation:swing 1.4s ease-in-out}
+  @media (hover:none){.track{padding-inline:calc(50vw - var(--w) / 2)}}
+  .hitem:focus-visible{outline:none}
+  .hitem:focus-visible .hsvg{outline:2px dashed var(--ink);outline-offset:4px;border-radius:8px}
+  .hsvg{display:block;width:100%;height:100%;transform-origin:50% 0}
+  .hsvg img{display:block;margin:0 auto;max-width:calc(var(--s,1)*100%);max-height:calc(var(--s,1)*100%);filter:drop-shadow(0 18px 16px rgba(0,0,0,.16));pointer-events:none;-webkit-user-drag:none}
+    .hsvg.lifted{visibility:hidden}
+  @keyframes slidein{from{opacity:0;translate:80px 0}to{opacity:1;translate:0 0}}
+  @keyframes swing{20%{transform:rotate(5deg)}45%{transform:rotate(-3.5deg)}70%{transform:rotate(1.6deg)}100%{transform:rotate(0)}}
+  .rail-arrow{position:absolute;top:42%;z-index:6;width:42px;height:42px;border-radius:50%;background:#fff;border:1px solid var(--line);font-size:22px;line-height:1;display:grid;place-items:center;box-shadow:0 4px 14px rgba(0,0,0,.08);transition:transform .2s}
+  .rail-arrow:hover{transform:scale(1.08)}
+  .rail-arrow.l{left:12px}.rail-arrow.r{right:12px}
+  .hint{font-size:12px;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;margin-top:-6px}
+  .pill-btn{display:inline-flex;align-items:center;gap:8px;margin-top:14px;padding:10px 18px;border-radius:99px;border:1.5px solid var(--ink);font-weight:700;font-size:13px;letter-spacing:.06em;text-transform:uppercase;transition:background .2s,color .2s}
+  .pill-btn:hover{background:var(--ink);color:#fff}
+
+  /* ---------- shop grid ---------- */
+  .shop{scroll-margin-top:70px;padding:40px clamp(16px,4vw,40px) 60px;max-width:1280px;margin:0 auto}
+  .shop-head{display:flex;flex-wrap:wrap;align-items:end;justify-content:space-between;gap:14px;margin-bottom:22px}
+  .shop-head h2{font-size:clamp(26px,3.6vw,40px);font-weight:800;letter-spacing:-.02em;line-height:1}
+  .shop-head p{color:var(--muted);font-size:14px;margin-top:6px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:18px}
+  .card{background:#fff;border-radius:20px;overflow:hidden;border:1px solid var(--line);transition:transform .3s,box-shadow .3s}
+  .card:hover{transform:translateY(-4px);box-shadow:0 18px 40px -18px rgba(0,0,0,.25)}
+  .card-open{display:block;width:100%;background:var(--tile);padding:18px 18px 6px;cursor:pointer}
+  .card-art{display:flex;align-items:flex-start;justify-content:center;width:76%;margin:0 auto;aspect-ratio:2/3;min-height:0;overflow:hidden}
+  .card-art img{display:block;max-width:calc(var(--s,1)*100%);max-height:calc(var(--s,1)*100%);filter:drop-shadow(0 12px 12px rgba(0,0,0,.14))}
+  .card-art.lifted{visibility:hidden}
+  .card-meta{display:flex;justify-content:space-between;align-items:start;gap:10px;padding:14px 16px 16px}
+  .card-meta h3{font-size:15px;font-weight:700;line-height:1.25}
+  .card-meta p{font-size:12px;color:var(--muted);margin-top:3px}
+  .card-price{font-weight:700;font-size:14px;white-space:nowrap}
+
+  footer.foot{border-top:1px solid var(--line);padding:26px clamp(16px,4vw,40px) 30px;display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;color:var(--muted);font-size:13px}
+
+  /* ---------- ticker ---------- */
+  .ticker{position:fixed;left:0;right:0;bottom:0;height:var(--tick);z-index:60;overflow:hidden;display:flex;align-items:center;
+    background:#c8ff1e}
+  .ticker-row{display:flex;white-space:nowrap;animation:marquee 26s linear infinite}
+  .ticker-row span{font:800 13px/1 "Bricolage Grotesque",sans-serif;letter-spacing:.12em;text-transform:uppercase;padding-right:28px;color:#111}
+  @keyframes marquee{to{transform:translateX(-50%)}}
+  @keyframes hue{to{background-position:200% 0}}
+
+  /* ---------- spotlight ---------- */
+  .spot{position:fixed;inset:0;z-index:50;overflow-y:auto;display:flex;justify-content:center}
+  .spot[hidden]{display:none}
+  .spot-bg{position:fixed;inset:0;background:rgba(247,245,241,.6);backdrop-filter:blur(16px) saturate(1.15);-webkit-backdrop-filter:blur(16px) saturate(1.15);opacity:0;transition:opacity .4s}
+  .spot.show .spot-bg{opacity:1}
+  .spot-inner{position:relative;width:100%;max-width:620px;display:flex;flex-direction:column;align-items:center;padding:clamp(54px,7vh,80px) 20px calc(var(--tick) + 34px);margin:auto 0}
+  .spot-g{position:relative;--sw:min(70vw,36vh,340px);width:var(--sw);height:calc(var(--sw) * 1.5);flex:none;transform-origin:50% 0;perspective:1000px}
+  .spot-glow{position:absolute;inset:12% -18% 0;border-radius:50%;background:radial-gradient(closest-side,var(--tile,#fff),transparent);opacity:0;transition:opacity .5s .15s;z-index:-1}
+  .spot.show .spot-glow{opacity:1}
+  .spot-flip{position:relative;width:100%;height:100%;display:flex;justify-content:center;align-items:flex-start;transform-origin:50% 0;animation:sway 5.5s ease-in-out infinite}
+  .spot-flip img{display:block;max-width:calc(var(--s,1)*100%);max-height:calc(var(--s,1)*100%);filter:drop-shadow(0 26px 24px rgba(0,0,0,.18))}
+  .spot-flip img.wipe-in{position:absolute;left:50%;top:0;translate:-50% 0}
+  .spot-tags{position:absolute;left:51.5%;top:calc(var(--s,1)*5.5%);width:20%;z-index:2;transform-origin:0 0;animation:tagsway 3.4s ease-in-out infinite;pointer-events:none;filter:drop-shadow(0 4px 4px rgba(0,0,0,.15));transition:opacity .3s .35s;opacity:0}
+  .spot.show .spot-tags{opacity:1}
+  @keyframes sway{0%,100%{transform:rotate(-1deg)}50%{transform:rotate(1deg)}}
+  @keyframes tagsway{0%,100%{transform:rotate(-3deg)}50%{transform:rotate(3deg)}}
+  .spot-info{text-align:center;margin-top:8px;opacity:0;transform:translateY(14px);transition:opacity .4s .25s,transform .5s .25s}
+  .spot.show .spot-info{opacity:1;transform:none}
+  .spot-cat{font-size:11px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--muted)}
+  .spot-name{font-size:clamp(17px,2.4vw,21px);font-weight:800;letter-spacing:.05em;text-transform:uppercase;margin:6px 0 12px}
+  .fb[hidden]{display:none}
+  .fb{display:inline-flex;border:1.5px solid var(--ink);border-radius:99px;padding:3px;background:#fff}
+  .fb button{padding:6px 18px;border-radius:99px;font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;transition:background .2s,color .2s}
+  .fb button.on{background:var(--ink);color:#fff}
+  .spot-price{font:800 22px/1 "Bricolage Grotesque",sans-serif;margin:16px 0 12px}
+  .sizes{display:flex;flex-wrap:wrap;justify-content:center;gap:6px}
+  .sizes button{min-width:44px;padding:8px 10px;border-radius:10px;border:1.5px solid var(--line);background:#fff;font-weight:700;font-size:13px;transition:border-color .2s,background .2s,color .2s}
+  .sizes button:hover{border-color:var(--ink)}
+  .sizes button.on{background:var(--ink);border-color:var(--ink);color:#fff}
+  .sizes.shake{animation:shake .45s}
+  @keyframes shake{20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}
+  .size-hint{height:18px;font-size:12px;color:#d6105f;font-weight:700;margin-top:6px}
+  .add{margin-top:4px;padding:14px 34px;border-radius:99px;background:var(--ink);color:#fff;font-weight:700;font-size:14px;letter-spacing:.06em;text-transform:uppercase;transition:transform .2s,background .3s}
+  .add:hover{transform:translateY(-2px);background:var(--accent,#000)}
+  .add.done{background:#1f9d55}
+  .more{display:block;margin:12px auto 0;font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid currentColor;padding-bottom:2px}
+  .details{max-width:420px;margin:12px auto 0;font-size:14px;line-height:1.55;color:#3d3a37;text-align:left;background:#fff;border:1px solid var(--line);border-radius:14px;padding:14px 16px}
+  .details[hidden]{display:none}
+  .details dl{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin-top:10px;font-size:13px}
+  .details dt{color:var(--muted)}
+  .spot-x{position:fixed;top:16px;right:16px;z-index:55;width:44px;height:44px;border-radius:50%;background:#fff;border:1px solid var(--line);font-size:22px;display:grid;place-items:center;box-shadow:0 4px 14px rgba(0,0,0,.08)}
+  .spot-nav{position:fixed;top:40%;z-index:55;width:48px;height:48px;border-radius:50%;background:#fff;border:1px solid var(--line);font-size:24px;display:grid;place-items:center;box-shadow:0 4px 14px rgba(0,0,0,.08);transition:transform .2s}
+  .spot-nav:hover{transform:scale(1.08)}
+  .spot-nav.l{left:clamp(8px,4vw,48px)}.spot-nav.r{right:clamp(8px,4vw,48px)}
+  .spot-count{position:fixed;top:26px;left:50%;transform:translateX(-50%);z-index:55;font-size:12px;font-weight:700;letter-spacing:.16em;color:var(--muted)}
+
+  /* ---------- bag ---------- */
+  .scrim{position:fixed;inset:0;background:rgba(20,20,20,.35);z-index:65;opacity:0;transition:opacity .3s}
+  .scrim.show{opacity:1}
+  .scrim[hidden]{display:none}
+  .bag{position:fixed;top:0;right:0;height:100%;width:min(420px,100%);background:#fff;z-index:70;display:flex;flex-direction:column;transform:translateX(105%);transition:transform .45s cubic-bezier(.2,.85,.25,1);box-shadow:-20px 0 50px rgba(0,0,0,.12)}
+  .bag.open{transform:none}
+  .bag header{display:flex;justify-content:space-between;align-items:center;padding:20px 22px;border-bottom:1px solid var(--line)}
+  .bag header h2{font-size:22px;font-weight:800}
+  .bag header button{font-size:24px;width:38px;height:38px;border-radius:50%;border:1px solid var(--line)}
+  .bag-list{flex:1;overflow-y:auto;padding:8px 22px}
+  .bag-empty{padding:50px 0;text-align:center;color:var(--muted)}
+  .bag-empty b{display:block;font:800 20px "Bricolage Grotesque";color:var(--ink);margin-bottom:6px}
+  .bi{display:grid;grid-template-columns:64px 1fr auto;gap:14px;padding:14px 0;border-bottom:1px solid var(--line);align-items:center}
+  .bi-art{width:64px;height:84px;border-radius:12px;display:grid;place-items:center;overflow:hidden}
+  .bi-art img{max-width:54px;max-height:78px}
+  .bi h4{font-size:14px;font-weight:700;line-height:1.25}
+  .bi p{font-size:12px;color:var(--muted);margin-top:2px}
+  .qty{display:inline-flex;align-items:center;gap:2px;margin-top:8px;border:1px solid var(--line);border-radius:99px}
+  .qty button{width:28px;height:28px;font-size:16px}
+  .qty span{min-width:18px;text-align:center;font-size:13px;font-weight:700}
+  .bi-right{text-align:right}
+  .bi-right b{font-size:14px}
+  .bi-right button{display:block;margin-top:10px;margin-left:auto;font-size:12px;color:var(--muted);text-decoration:underline}
+  .bag footer{padding:18px 22px calc(18px + var(--tick));border-top:1px solid var(--line)}
+  .sub{display:flex;justify-content:space-between;font-size:15px;margin-bottom:14px}
+  .sub b{font:800 20px "Bricolage Grotesque"}
+  .checkout{width:100%;padding:15px;border-radius:99px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:#fff;background:var(--ink);transition:transform .2s,background .3s}
+  .checkout:hover{background:var(--pink)}
+  .checkout:hover{transform:translateY(-2px)}
+  .checkout:disabled{opacity:.4;cursor:not-allowed;transform:none}
+  .bag-note{font-size:12px;color:var(--muted);text-align:center;margin-top:10px;min-height:16px}
+  .bag-note.warn{color:#b0124f;font-weight:700}
+
+  .toast{position:fixed;left:50%;bottom:calc(var(--tick) + 18px);z-index:80;transform:translate(-50%,20px);opacity:0;pointer-events:none;background:var(--ink);color:#fff;padding:12px 18px;border-radius:99px;font-size:13px;font-weight:700;transition:opacity .3s,transform .3s;max-width:calc(100% - 32px);text-align:center}
+  .toast.show{opacity:1;transform:translate(-50%,0)}
+
+  @media (max-width:640px){
+    :root{--w:136px}
+    .logo-word{font-size:22px}
+    .demo-pill{display:none}
+    .rail-arrow{display:none}
+    .spot-nav{top:auto;bottom:calc(var(--tick) + 14px);width:44px;height:44px}
+    .spot-count{top:28px}
+    .grid{grid-template-columns:repeat(2,1fr);gap:12px}
+    .card-meta{flex-direction:column;gap:4px;padding:12px}
+    .card-meta h3{font-size:13.5px}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <a class="logo" href="#" aria-label="AETHOL home"><span class="logo-word display">AETHOL</span><span class="demo-pill">Demo store</span></a>
+  <button class="bag-btn" id="bagBtn" aria-label="Open bag">Bag <span class="bag-count" id="bagCount">0</span></button>
+</header>
+
+<main>
+  <section class="stage">
+    <p class="eyebrow">Festive collection · demo</p>
+    <h1>Pick a piece <em>off the rail</em></h1>
+    <div class="tabs" data-tabs>
+      <button data-f="all" class="on">All</button><button data-f="women">Women</button><button data-f="men">Men</button>
+    </div>
+    <div class="rail-wrap">
+      <button class="rail-arrow l" id="railL" aria-label="Scroll rail left">‹</button>
+      <div class="rail" id="rail"><div class="track" id="track"></div></div>
+      <button class="rail-arrow r" id="railR" aria-label="Scroll rail right">›</button>
+    </div>
+    <p class="hint">Drag the rail · tap a piece to try it</p>
+    <button class="pill-btn" id="seeAll">See all pieces ↓</button>
+  </section>
+
+  <section class="shop" id="shop">
+    <div class="shop-head">
+      <div><h2>The collection</h2><p id="shopCount"></p></div>
+      <div class="tabs" data-tabs>
+        <button data-f="all" class="on">All</button><button data-f="women">Women</button><button data-f="men">Men</button>
+      </div>
+    </div>
+    <div class="grid" id="grid"></div>
+  </section>
+</main>
+
+<footer class="foot">
+  <span>AETHOL · demo storefront</span>
+  <span>Product images are AI-generated samples · prices are placeholders · no real orders</span>
+</footer>
+
+<div class="ticker" aria-hidden="true"><div class="ticker-row" id="tickerRow"></div></div>
+
+<!-- spotlight -->
+<div class="spot" id="spot" hidden role="dialog" aria-modal="true" aria-labelledby="spotName">
+  <div class="spot-bg" id="spotBg"></div>
+  <span class="spot-count" id="spotCount"></span>
+  <button class="spot-x" id="spotX" aria-label="Close">×</button>
+  <button class="spot-nav l" id="spotPrev" aria-label="Previous piece">‹</button>
+  <button class="spot-nav r" id="spotNext" aria-label="Next piece">›</button>
+  <div class="spot-inner">
+    <div class="spot-g" id="spotG"><div class="spot-glow"></div><div class="spot-flip" id="spotFlip"></div>
+      <svg class="spot-tags" viewBox="0 0 60 90" aria-hidden="true"><path d="M1 1L22 25M1 1L44 20" stroke="#55575c" stroke-width=".8" fill="none"/>
+        <g transform="rotate(-7 22 25)"><rect x="13" y="24" width="18" height="44" rx="3" fill="#18181a"/><circle cx="22" cy="29" r="1.7" fill="#f7f5f1"/><text x="22" y="47" font-size="5.6" fill="#fff" font-family="Bricolage Grotesque,sans-serif" font-weight="800" text-anchor="middle" letter-spacing=".8" transform="rotate(90 22 47)">AETHOL</text></g>
+        <g transform="rotate(6 44 20)"><rect x="36" y="19" width="16" height="34" rx="3" fill="#dcbd90"/><circle cx="44" cy="24" r="1.5" fill="#f7f5f1"/><rect x="39" y="30" width="10" height="1.2" fill="#8a6a3e"/><rect x="39" y="34" width="7" height="1.2" fill="#8a6a3e"/><rect x="39" y="38" width="10" height="1.2" fill="#8a6a3e"/><rect x="39" y="42" width="6" height="1.2" fill="#8a6a3e"/></g></svg></div>
+    <div class="spot-info">
+      <p class="spot-cat" id="spotCat"></p>
+      <h2 class="spot-name" id="spotName"></h2>
+      <div class="fb" id="fb"><button data-v="front" class="on">Front</button><button data-v="back">Back</button></div>
+      <p class="spot-price" id="spotPrice"></p>
+      <div class="sizes" id="sizes"></div>
+      <p class="size-hint" id="sizeHint"></p>
+      <button class="add" id="addBtn">Add to bag</button>
+      <button class="more" id="moreBtn">See details ⌄</button>
+      <div class="details" id="details" hidden></div>
+    </div>
+  </div>
+</div>
+
+<!-- bag -->
+<div class="scrim" id="scrim" hidden></div>
+<aside class="bag" id="bag" aria-label="Shopping bag" aria-hidden="true">
+  <header><h2>Your bag</h2><button id="bagClose" aria-label="Close bag">×</button></header>
+  <div class="bag-list" id="bagList"></div>
+  <footer>
+    <div class="sub"><span>Subtotal</span><b id="subtotal">₹0</b></div>
+    <button class="checkout" id="checkout">Checkout</button>
+    <p class="bag-note" id="bagNote">Demo store — no real orders or payments.</p>
+  </footer>
+</aside>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+/* =========================================================
+   PRODUCTS (demo data — names, prices and details are placeholders)
+   ========================================================= */
+const ITEMS = [
+  {id:'rani-lehenga', af:0.6218, ab:0.6074, s:1, back:true, type:'lehenga', cat:'women', kind:'Lehenga set', name:'Rani Pink Zari Lehenga', price:48500,
+   base:'#e8197d', trim:'#f7c331', motif:'#ffd76a', pat:'buta', tile:'#ffe1ee',
+   desc:'A full-flare lehenga with a wide zari hem, a short-sleeve blouse and a sheer dupatta.', fabric:'Silk blend', work:'Zari border, buta motifs'},
+  {id:'sky-kurta', af:0.5355, ab:0.658, s:0.9, back:true, type:'kurta', cat:'men', kind:'Kurta', name:'Sky Chikan Kurta', price:4200,
+   base:'#3d9bff', trim:'#e9f3ff', motif:'#eaf4ff', pat:'dots', tile:'#dcecff',
+   desc:'A straight, knee-length kurta with a band collar and a buttoned placket.', fabric:'Cotton', work:'Dot embroidery'},
+  {id:'teal-anarkali', af:0.54, ab:0.6864, s:1, back:true, type:'anarkali', cat:'women', kind:'Anarkali', name:'Teal & Coral Anarkali', price:14900,
+   base:'#0aa5a0', trim:'#ff7f5c', motif:'#ffd2a8', pat:'lattice', tile:'#d6f5f2',
+   desc:'A floor-length anarkali with a fitted bodice, full sleeves and a deep-pleated flare.', fabric:'Georgette', work:'Lattice print, coral borders'},
+  {id:'emerald-sherwani', af:0.5173, ab:0.5852, s:0.96, back:true, type:'sherwani', cat:'men', kind:'Sherwani', name:'Emerald Brocade Sherwani', price:36000,
+   base:'#0f7a52', trim:'#e9bf45', motif:'#e9bf45', pat:'lattice', tile:'#d8f1e4',
+   desc:'A long sherwani with a high collar, a gold front panel and a row of gold buttons.', fabric:'Brocade', work:'Gold lattice, zari hem'},
+  {id:'marigold-kurti', af:0.5627, ab:0.6556, s:0.86, back:true, type:'kurti', cat:'women', kind:'Kurti', name:'Marigold Block-Print Kurti', price:3450,
+   base:'#f5ad16', trim:'#2f3c97', motif:'#2f3c97', pat:'block', tile:'#fff0cc',
+   desc:'A relaxed A-line kurti with three-quarter sleeves, side slits and an embroidered neckline.', fabric:'Cotton', work:'Indigo block print'},
+  {id:'tangerine-nehru', af:0.6327, ab:0.616, s:0.72, back:true, type:'nehru', cat:'men', kind:'Nehru jacket', name:'Tangerine Nehru Jacket', price:6800,
+   base:'#ff6a2b', trim:'#7a1f0e', motif:'#ffc59e', pat:'buta', tile:'#ffe3d4',
+   desc:'A sleeveless band-collar jacket with welt pockets — wear it over any kurta.', fabric:'Raw silk', work:'Buta weave'},
+  {id:'lilac-gown', af:0.4873, ab:0.7012, s:1, back:true, type:'gown', cat:'women', kind:'Gown', name:'Lilac Tiered Gown', price:22000,
+   base:'#b49bff', trim:'#ff8fc8', motif:'#ffffff', pat:'dots', tile:'#ece6ff',
+   desc:'A three-tier gown with a sweetheart bodice, a pink sash and crossed straps at the back.', fabric:'Organza', work:'Sparkle dots'},
+  {id:'lime-shirt', af:0.7755, ab:0.8099, s:0.76, back:true, type:'shirt', cat:'men', kind:'Festive shirt', name:'Lime Tropic Festive Shirt', price:2900,
+   base:'#8fdc4f', trim:'#ff4f9a', motif:'#1e7a3c', pat:'tropic', tile:'#e9fbd8',
+   desc:'A short-sleeve camp-collar shirt in a loud leaf-and-berry print.', fabric:'Viscose', work:'Tropical print'},
+  {id:'cobalt-kurta', af:0.6264, ab:0.6901, s:0.9, back:true, type:'kurta', cat:'men', kind:'Kurta', name:'Cobalt Silk Kurta', price:5600,
+   base:'#2b46d6', trim:'#f2c14e', motif:'#f2c14e', pat:'buta', tile:'#dfe4ff',
+   desc:'A silk kurta with gold buta motifs, a gold collar and a zari hem.', fabric:'Art silk', work:'Gold buta'},
+  {id:'saffron-lehenga', af:0.6909, ab:0.6909, s:1, back:false, type:'lehenga', cat:'women', kind:'Lehenga set', name:'Saffron Mirror Lehenga', price:39000,
+   base:'#ff8a00', trim:'#d0115f', motif:'#ffe08a', pat:'lattice', tile:'#ffe8cc',
+   desc:'A bright saffron lehenga with a berry border, lattice body and matching dupatta.', fabric:'Silk blend', work:'Lattice, berry border'},
+];
+const SIZES = {women:['XS','S','M','L','XL','Custom'], men:['S','M','L','XL','XXL','Custom']};
+const byId = id => ITEMS.find(i => i.id === id);
+const fmt = n => '₹' + n.toLocaleString('en-IN');
+const catLabel = it => (it.cat === 'women' ? 'Women' : 'Men') + ' · ' + it.kind;
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+/* =========================================================
+   PRODUCT PHOTOS — img/<id>-front.webp and img/<id>-back.webp
+   --s scales shorter garments down so the rail looks natural
+   ========================================================= */
+// back photos are framed differently, so scale them to the same height as the front
+const backScale = it => Math.min(1.15, it.s * Math.min(1.5, 1 / it.af) / Math.min(1.5, 1 / it.ab));
+const img = (it, view = 'front') => {
+  const b = view === 'back' && it.back;
+  return `<img src="img/${it.id}-${b ? 'back' : 'front'}.webp" alt="${it.name}, ${b ? 'back' : 'front'} view" style="--s:${b ? backScale(it).toFixed(3) : it.s}" draggable="false" decoding="async">`;
+};
+
+/* =========================================================
+   PAGE STATE & RENDERING
+   ========================================================= */
+const $ = s => document.querySelector(s);
+const rail = $('#rail'), track = $('#track'), grid = $('#grid');
+let filter = 'all';
+const list = () => ITEMS.filter(i => filter === 'all' || i.cat === filter);
+
+/* rail effect: pieces hang side-on; the active one turns to face you and its neighbours slide aside */
+const touchMode = matchMedia('(hover: none)').matches;
+let active = null;
+function applyRail() {
+  const els = [...track.children];
+  els.forEach((el, i) => {
+    let ry = '52deg', tx = '0px', sc = '.96', z = i + 1;
+    if (active !== null) {
+      const d = i - active;
+      if (d === 0) { ry = '0deg'; sc = '1.06'; z = 100; }
+      else { ry = (d < 0 ? 58 : -58) + 'deg'; tx = `calc(var(--w) * ${d < 0 ? -.34 : .34})`; z = 100 - Math.abs(d); }
+    }
+    el.style.setProperty('--ry', ry); el.style.setProperty('--tx', tx);
+    el.style.setProperty('--sc', sc); el.style.setProperty('--z', z);
+    el.classList.toggle('act', i === active);
+  });
+}
+function setActive(i) { if (i === active) return; active = i; applyRail(); }
+function nearestToCentre() {
+  const mid = rail.scrollLeft + rail.clientWidth / 2; let best = 0, bd = 1e9;
+  [...track.children].forEach((el, i) => { const c = el.offsetLeft + el.offsetWidth / 2, dd = Math.abs(c - mid); if (dd < bd) { bd = dd; best = i; } });
+  return best;
+}
+function centreOn(i, smooth = true) {
+  const el = track.children[i]; if (!el) return;
+  rail.scrollTo({left: el.offsetLeft + el.offsetWidth / 2 - rail.clientWidth / 2, behavior: smooth && !reduce ? 'smooth' : 'auto'});
+}
+if (touchMode) {
+  let raf = 0;
+  rail.addEventListener('scroll', () => { cancelAnimationFrame(raf); raf = requestAnimationFrame(() => setActive(nearestToCentre())); }, {passive: true});
+} else {
+  track.addEventListener('mouseover', e => { const b = e.target.closest('.hitem'); if (b && !drag) setActive([...track.children].indexOf(b)); });
+  rail.addEventListener('mouseleave', () => { if (!cur) setActive(null); });
+  track.addEventListener('focusin', e => { const b = e.target.closest('.hitem'); if (b) setActive([...track.children].indexOf(b)); });
+}
+
+function renderRail() {
+  track.innerHTML = list().map((it, i) =>
+    `<button class="hitem" data-id="${it.id}" style="--i:${i}" aria-label="${it.name}, ${fmt(it.price)}"><span class="hsvg">${img(it)}</span></button>`).join('');
+  rail.scrollLeft = 0;
+  active = touchMode ? 0 : null; applyRail();
+}
+function renderGrid() {
+  const L = list();
+  grid.innerHTML = L.map(it =>
+    `<article class="card" data-id="${it.id}" style="--tile:${it.tile}">
+       <button class="card-open" data-id="${it.id}" aria-label="View ${it.name}"><span class="card-art">${img(it)}</span></button>
+       <div class="card-meta"><div><h3>${it.name}</h3><p>${catLabel(it)}</p></div><span class="card-price">${fmt(it.price)}</span></div>
+     </article>`).join('');
+  $('#shopCount').textContent = `${L.length} pieces · tap any to try it on the rail view`;
+}
+function setFilter(f) {
+  filter = f;
+  document.querySelectorAll('[data-tabs] button').forEach(b => b.classList.toggle('on', b.dataset.f === f));
+  renderRail(); renderGrid();
+}
+document.querySelectorAll('[data-tabs]').forEach(t => t.addEventListener('click', e => {
+  const b = e.target.closest('button'); if (b && b.dataset.f !== filter) setFilter(b.dataset.f);
+}));
+
+/* rail: drag to scroll (mouse), arrows */
+let drag = null, moved = false;
+rail.addEventListener('pointerdown', e => {
+  if (e.pointerType !== 'mouse' || e.button !== 0) return;
+  drag = {x: e.clientX, s: rail.scrollLeft}; moved = false;
+});
+window.addEventListener('pointermove', e => {
+  if (!drag) return;
+  const dx = e.clientX - drag.x;
+  if (Math.abs(dx) > 6) { moved = true; rail.classList.add('dragging'); }
+  if (moved) rail.scrollLeft = drag.s - dx;
+});
+window.addEventListener('pointerup', () => { drag = null; rail.classList.remove('dragging'); });
+$('#railL').onclick = () => rail.scrollBy({left: -rail.clientWidth * .6, behavior: 'smooth'});
+$('#railR').onclick = () => rail.scrollBy({left: rail.clientWidth * .6, behavior: 'smooth'});
+track.addEventListener('click', e => {
+  const b = e.target.closest('.hitem'); if (!b) return;
+  if (moved) { moved = false; return; }
+  const i = [...track.children].indexOf(b);
+  if (touchMode && i !== active) { centreOn(i); return; }   // first tap brings it to the front
+  setActive(i);
+  openSpot(b.dataset.id, b.querySelector('.hsvg'), 'rail');
+});
+grid.addEventListener('click', e => {
+  const b = e.target.closest('.card-open'); if (!b) return;
+  openSpot(b.dataset.id, b.querySelector('.card-art'), 'grid');
+});
+$('#seeAll').onclick = () => $('#shop').scrollIntoView({behavior: reduce ? 'auto' : 'smooth'});
+
+/* ticker */
+(() => {
+  const words = ['New festive drop', 'Bridal', 'Groom', 'Lehengas', 'Sherwanis', 'Made for you', 'Any style · any fabric', 'AETHOL demo store'];
+  const row = words.map(w => `<span>${w} ✦</span>`).join('');
+  $('#tickerRow').innerHTML = row + row + row + row;
+})();
+
+/* =========================================================
+   SPOTLIGHT — garment comes off the rail
+   ========================================================= */
+const spot = $('#spot'), spotG = $('#spotG'), spotFlip = $('#spotFlip');
+let cur = null, src = null, srcKind = 'rail', view = 'front', size = null;
+
+function setSource(el) {
+  if (src) src.classList.remove('lifted');
+  src = el; if (src) src.classList.add('lifted');
+}
+function sourceFor(id) {
+  return srcKind === 'grid'
+    ? document.querySelector(`.card[data-id="${id}"] .card-art`)
+    : document.querySelector(`.hitem[data-id="${id}"] .hsvg`);
+}
+function fillSpot() {
+  const it = byId(cur), L = list();
+  spotFlip.innerHTML = img(it, view);
+  spot.style.setProperty('--tile', it.tile);
+  spotG.style.setProperty('--s', it.s);
+  $('#fb').hidden = !it.back;
+  if (it.back) { const pre = new Image(); pre.src = `img/${it.id}-back.webp`; }
+  spot.style.setProperty('--accent', it.base);
+  $('#spotCat').textContent = catLabel(it);
+  $('#spotName').textContent = it.name;
+  $('#spotPrice').textContent = fmt(it.price);
+  $('#spotCount').textContent = `${L.findIndex(x => x.id === cur) + 1} / ${L.length}`;
+  document.querySelectorAll('#fb button').forEach(b => b.classList.toggle('on', b.dataset.v === view));
+  $('#sizes').innerHTML = SIZES[it.cat].map(s => `<button data-s="${s}">${s}</button>`).join('');
+  $('#sizeHint').textContent = '';
+  const add = $('#addBtn'); add.textContent = 'Add to bag'; add.classList.remove('done');
+  $('#details').hidden = true; $('#moreBtn').textContent = 'See details ⌄';
+  $('#details').innerHTML = `${it.desc}<dl><dt>Fabric</dt><dd>${it.fabric}</dd><dt>Detail</dt><dd>${it.work}</dd><dt>Fit</dt><dd>Standard sizes or made to your measurements</dd><dt>Note</dt><dd>Demo product — placeholder details</dd></dl>`;
+}
+function rectTransform(a, b) {
+  const s = a.height / b.height;
+  const dx = (a.left + a.width / 2) - (b.left + b.width / 2);
+  const dy = a.top - b.top;
+  return `translate(${dx}px,${dy}px) scale(${s})`;
+}
+function openSpot(id, el, kind) {
+  cur = id; srcKind = kind; view = 'front'; size = null;
+  fillSpot();
+  spot.hidden = false; spot.scrollTop = 0;
+  document.body.classList.add('lock');
+  const from = el.getBoundingClientRect();
+  setSource(el);
+  requestAnimationFrame(() => {
+    spot.classList.add('show');
+    if (reduce) return;
+    const to = spotG.getBoundingClientRect();
+    spotG.animate([{transform: rectTransform(from, to)}, {transform: 'none'}], {duration: 700, easing: 'cubic-bezier(.2,.85,.25,1)'});
+  });
+  setTimeout(() => $('#spotX').focus({preventScroll: true}), 50);
+}
+function closeSpot() {
+  if (!cur) return;
+  const el = src;
+  spot.classList.remove('show');
+  const done = () => {
+    spot.hidden = true; setSource(null); cur = null;
+    if (!touchMode && !rail.matches(':hover')) setActive(null);
+    document.body.classList.remove('lock');
+  };
+  const vis = el && (() => { const r = el.getBoundingClientRect(); return r.bottom > 0 && r.top < innerHeight && r.right > 0 && r.left < innerWidth; })();
+  if (el && vis && !reduce) {
+    const a = el.getBoundingClientRect(), b = spotG.getBoundingClientRect();
+    const anim = spotG.animate([{transform: 'none'}, {transform: rectTransform(a, b)}], {duration: 520, easing: 'cubic-bezier(.5,0,.25,1)', fill: 'forwards'});
+    anim.onfinish = () => { done(); anim.cancel(); };
+  } else {
+    const anim = spotG.animate([{opacity: 1}, {opacity: 0}], {duration: 200});
+    anim.onfinish = done;
+  }
+}
+function step(dir) {
+  if (!cur) return;
+  const L = list(); let i = L.findIndex(x => x.id === cur);
+  const it = L[(i + dir + L.length) % L.length];
+  const go = () => {
+    cur = it.id; view = 'front'; size = null; fillSpot();
+    const el = sourceFor(it.id); setSource(el);
+    if (el && srcKind === 'rail') {
+      const i = [...track.children].indexOf(el.closest('.hitem'));
+      setActive(i); centreOn(i, false);
+    } else if (el) {
+      el.closest('.card').scrollIntoView({block: 'center'});
+    }
+    if (!reduce) spotG.animate([{transform: `translateX(${dir * 90}px) rotate(${dir * 5}deg)`, opacity: 0}, {transform: 'none', opacity: 1}], {duration: 380, easing: 'cubic-bezier(.2,.85,.25,1)'});
+  };
+  if (reduce) return go();
+  spotG.animate([{transform: 'none', opacity: 1}, {transform: `translateX(${-dir * 90}px) rotate(${-dir * 5}deg)`, opacity: 0}], {duration: 200, easing: 'ease-in'}).onfinish = go;
+}
+function setView(v) {
+  if (v === view) return;
+  view = v;
+  document.querySelectorAll('#fb button').forEach(b => b.classList.toggle('on', b.dataset.v === view));
+  const it = byId(cur);
+  if (reduce) { spotFlip.innerHTML = img(it, view); return; }
+  spotFlip.getAnimations({subtree: true}).filter(a => a.id === 'wipe').forEach(a => a.finish());
+  const old = spotFlip.querySelector('img');
+  spotFlip.insertAdjacentHTML('beforeend', img(it, view));
+  const nu = spotFlip.lastElementChild; nu.classList.add('wipe-in');
+  const run = () => {
+    const an = nu.animate([{clipPath: 'inset(0 0 100% 0)'}, {clipPath: 'inset(0 0 0% 0)'}], {duration: 700, easing: 'cubic-bezier(.65,0,.25,1)', id: 'wipe'});
+    if (old) old.animate([{opacity: 1, filter: 'blur(0)'}, {opacity: 0, filter: 'blur(3px)'}], {duration: 700, easing: 'ease-in', id: 'wipe', fill: 'forwards'});
+    an.onfinish = () => { if (old) old.remove(); nu.classList.remove('wipe-in'); };
+  };
+  if (nu.complete) run(); else { nu.onload = run; nu.onerror = run; }
+}
+$('#spotX').onclick = closeSpot;
+$('#spotBg').onclick = closeSpot;
+$('#spotPrev').onclick = () => step(-1);
+$('#spotNext').onclick = () => step(1);
+$('#fb').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setView(b.dataset.v); });
+$('#sizes').addEventListener('click', e => {
+  const b = e.target.closest('button'); if (!b) return;
+  size = b.dataset.s;
+  document.querySelectorAll('#sizes button').forEach(x => x.classList.toggle('on', x === b));
+  $('#sizeHint').textContent = size === 'Custom' ? 'We’ll take your measurements after you order' : '';
+  $('#sizeHint').style.color = size === 'Custom' ? 'var(--muted)' : '';
+});
+$('#moreBtn').onclick = () => {
+  const d = $('#details'); d.hidden = !d.hidden;
+  $('#moreBtn').textContent = d.hidden ? 'See details ⌄' : 'Hide details ⌃';
+};
+$('#addBtn').onclick = () => {
+  const it = byId(cur);
+  if (!size) {
+    const s = $('#sizes'); s.classList.remove('shake'); void s.offsetWidth; s.classList.add('shake');
+    $('#sizeHint').style.color = ''; $('#sizeHint').textContent = 'Pick a size first';
+    return;
+  }
+  addToBag(it.id, size);
+  const add = $('#addBtn'); add.textContent = 'Added ✓'; add.classList.add('done');
+  toast(`${it.name} · ${size} added to your bag`);
+};
+/* swipe in spotlight */
+let tx = null;
+spot.addEventListener('touchstart', e => { tx = e.touches[0].clientX; }, {passive: true});
+spot.addEventListener('touchend', e => {
+  if (tx === null) return; const dx = e.changedTouches[0].clientX - tx; tx = null;
+  if (Math.abs(dx) > 60 && !e.target.closest('.sizes,.fb,.details')) step(dx < 0 ? 1 : -1);
+});
+document.addEventListener('keydown', e => {
+  if ($('#bag').classList.contains('open')) { if (e.key === 'Escape') closeBag(); return; }
+  if (!cur) return;
+  if (e.key === 'Escape') closeSpot();
+  if (e.key === 'ArrowRight') step(1);
+  if (e.key === 'ArrowLeft') step(-1);
+});
+
+/* =========================================================
+   BAG
+   ========================================================= */
+let bag = [];
+try { bag = JSON.parse(localStorage.getItem('aethol-demo-bag') || '[]').filter(x => byId(x.id)); } catch (e) { bag = []; }
+const save = () => { try { localStorage.setItem('aethol-demo-bag', JSON.stringify(bag)); } catch (e) {} };
+function addToBag(id, sz) {
+  const f = bag.find(x => x.id === id && x.size === sz);
+  if (f) f.qty++; else bag.push({id, size: sz, qty: 1});
+  save(); renderBag(true);
+}
+function renderBag(bump) {
+  const n = bag.reduce((a, x) => a + x.qty, 0);
+  const c = $('#bagCount'); c.textContent = n;
+  if (bump) { c.classList.remove('bump'); void c.offsetWidth; c.classList.add('bump'); }
+  const listEl = $('#bagList');
+  if (!bag.length) {
+    listEl.innerHTML = `<div class="bag-empty"><b>Your bag is empty</b>Pick a piece off the rail to get started.</div>`;
+  } else {
+    listEl.innerHTML = bag.map((x, i) => {
+      const it = byId(x.id);
+      return `<div class="bi"><div class="bi-art" style="background:${it.tile}">${img(it)}</div>
+        <div><h4>${it.name}</h4><p>${catLabel(it)} · Size ${x.size}</p>
+          <div class="qty"><button data-q="-1" data-i="${i}" aria-label="Less">−</button><span>${x.qty}</span><button data-q="1" data-i="${i}" aria-label="More">+</button></div></div>
+        <div class="bi-right"><b>${fmt(it.price * x.qty)}</b><button data-r="${i}">Remove</button></div></div>`;
+    }).join('');
+  }
+  $('#subtotal').textContent = fmt(bag.reduce((a, x) => a + byId(x.id).price * x.qty, 0));
+  $('#checkout').disabled = !bag.length;
+  const note = $('#bagNote'); note.classList.remove('warn'); note.textContent = 'Demo store — no real orders or payments.';
+}
+$('#bagList').addEventListener('click', e => {
+  const q = e.target.closest('[data-q]'), r = e.target.closest('[data-r]');
+  if (q) { const x = bag[+q.dataset.i]; x.qty += +q.dataset.q; if (x.qty < 1) bag.splice(+q.dataset.i, 1); }
+  else if (r) bag.splice(+r.dataset.r, 1);
+  else return;
+  save(); renderBag();
+});
+function openBag() {
+  $('#scrim').hidden = false; requestAnimationFrame(() => $('#scrim').classList.add('show'));
+  $('#bag').classList.add('open'); $('#bag').setAttribute('aria-hidden', 'false');
+}
+function closeBag() {
+  $('#scrim').classList.remove('show'); setTimeout(() => $('#scrim').hidden = true, 300);
+  $('#bag').classList.remove('open'); $('#bag').setAttribute('aria-hidden', 'true');
+}
+$('#bagBtn').onclick = openBag;
+$('#bagClose').onclick = closeBag;
+$('#scrim').onclick = closeBag;
+$('#checkout').onclick = () => {
+  const note = $('#bagNote'); note.classList.add('warn');
+  note.textContent = 'This is a demo — checkout isn’t connected yet. In the real store this step would take payment.';
+};
+
+let tt;
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.classList.add('show');
+  clearTimeout(tt); tt = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+/* go */
+renderRail(); renderGrid(); renderBag();
+</script>
+</body>
+</html>
