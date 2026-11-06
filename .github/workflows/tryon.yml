@@ -1,0 +1,53 @@
+# AETHOL try-on robot
+# Runs by itself whenever garment photos or the product list change,
+# once a day (to finish anything left over when the free limit ran out),
+# and whenever you press "Run workflow" on GitHub's Actions tab.
+name: Dress the models
+
+on:
+  push:
+    branches: [main]
+    paths: ['img/**', 'index.html', 'tryon/models/**', 'scripts/tryon/**']
+  schedule:
+    - cron: '23 1 * * *'   # every day at 05:23 Dubai time
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: tryon-robot
+  cancel-in-progress: false
+
+jobs:
+  dress:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install the picture tool
+        run: npm install --no-save --no-package-lock sharp@0.33
+
+      - name: Make try-on pictures
+        run: node scripts/tryon/run.mjs
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_IMAGE_MODEL: ${{ vars.GEMINI_IMAGE_MODEL }}
+
+      - name: Save the new pictures to the site
+        run: |
+          git config user.name "aethol-tryon-robot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add tryon
+          if git diff --cached --quiet; then
+            echo "Nothing new to save."
+          else
+            git commit -m "Try-on robot: new model photos"
+            git pull --rebase origin main
+            git push
+          fi

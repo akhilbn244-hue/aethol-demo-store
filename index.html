@@ -122,6 +122,19 @@
   .fb{display:inline-flex;border:1.5px solid var(--ink);border-radius:99px;padding:3px;background:#fff}
   .fb button{padding:6px 18px;border-radius:99px;font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;transition:background .2s,color .2s}
   .fb button.on{background:var(--ink);color:#fff}
+  /* on hanger / on model (AI try-on) */
+  .wear{display:flex;width:max-content;margin:0 auto 10px;gap:4px;padding:4px;border-radius:99px;background:#fff;border:1px solid var(--line)}
+  .wear[hidden]{display:none}
+  .wear button{padding:7px 16px;border-radius:99px;font-size:12px;font-weight:700;letter-spacing:.06em;color:var(--muted);transition:background .25s,color .25s}
+  .wear button.on{background:var(--ink);color:#fff}
+  .wear button:disabled{opacity:.5;cursor:not-allowed}
+  .wear .soon{font-weight:500;font-size:10.5px;letter-spacing:.02em}
+  .spot.model .spot-flip{animation:none}
+  .spot.model .spot-tags{display:none}
+  .spot-flip img.mphoto{width:100%;max-width:100%;max-height:none;height:auto;aspect-ratio:3/4;object-fit:cover;border-radius:22px;background:#fcf6f0;filter:drop-shadow(0 22px 26px rgba(0,0,0,.16))}
+  .ai-badge{position:absolute;top:12px;left:12px;z-index:3;font-size:10px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;background:rgba(20,20,20,.78);color:#fff;padding:5px 10px;border-radius:99px;pointer-events:none}
+  .ai-badge[hidden]{display:none}
+  .ai-note{min-height:16px;font-size:12px;color:var(--muted);margin-top:8px}
   .spot-price{font:800 22px/1 "Bricolage Grotesque",sans-serif;margin:16px 0 12px}
   .sizes{display:flex;flex-wrap:wrap;justify-content:center;gap:6px}
   .sizes button{min-width:44px;padding:8px 10px;border-radius:10px;border:1.5px solid var(--line);background:#fff;font-weight:700;font-size:13px;transition:border-color .2s,background .2s,color .2s}
@@ -245,14 +258,16 @@
   <button class="spot-nav l" id="spotPrev" aria-label="Previous piece">‹</button>
   <button class="spot-nav r" id="spotNext" aria-label="Next piece">›</button>
   <div class="spot-inner">
-    <div class="spot-g" id="spotG"><div class="spot-glow"></div><div class="spot-flip" id="spotFlip"></div>
+    <div class="spot-g" id="spotG"><div class="spot-glow"></div><div class="spot-flip" id="spotFlip"></div><span class="ai-badge" id="aiBadge" hidden>AI preview</span>
       <svg class="spot-tags" viewBox="0 0 60 90" aria-hidden="true"><path d="M1 1L22 25M1 1L44 20" stroke="#55575c" stroke-width=".8" fill="none"/>
         <g transform="rotate(-7 22 25)"><rect x="13" y="24" width="18" height="44" rx="3" fill="#18181a"/><circle cx="22" cy="29" r="1.7" fill="#f7f5f1"/><text x="22" y="47" font-size="5.6" fill="#fff" font-family="Bricolage Grotesque,sans-serif" font-weight="800" text-anchor="middle" letter-spacing=".8" transform="rotate(90 22 47)">AETHOL</text></g>
         <g transform="rotate(6 44 20)"><rect x="36" y="19" width="16" height="34" rx="3" fill="#dcbd90"/><circle cx="44" cy="24" r="1.5" fill="#f7f5f1"/><rect x="39" y="30" width="10" height="1.2" fill="#8a6a3e"/><rect x="39" y="34" width="7" height="1.2" fill="#8a6a3e"/><rect x="39" y="38" width="10" height="1.2" fill="#8a6a3e"/><rect x="39" y="42" width="6" height="1.2" fill="#8a6a3e"/></g></svg></div>
     <div class="spot-info">
       <p class="spot-cat" id="spotCat"></p>
       <h2 class="spot-name" id="spotName"></h2>
+      <div class="wear" id="wear" hidden><button data-m="hanger" class="on">On hanger</button><button data-m="model">On model</button></div>
       <div class="fb" id="fb"><button data-v="front" class="on">Front</button><button data-v="back">Back</button></div>
+      <p class="ai-note" id="aiNote"></p>
       <p class="spot-price" id="spotPrice"></p>
       <div class="sizes" id="sizes"></div>
       <p class="size-hint" id="sizeHint"></p>
@@ -449,6 +464,50 @@ $('#seeAll').onclick = () => $('#shop').scrollIntoView({behavior: reduce ? 'auto
 const spot = $('#spot'), spotG = $('#spotG'), spotFlip = $('#spotFlip');
 let cur = null, src = null, srcKind = 'rail', view = 'front', size = null;
 
+/* =========================================================
+   ON MODEL — AI try-on photos made by the robot
+   (scripts/tryon/run.mjs) and listed in tryon/tryon.json
+   ========================================================= */
+let TRY = null, want = 'hanger';                 // want = what the shopper picked
+fetch('tryon/tryon.json', {cache: 'no-cache'})
+  .then(r => r.ok ? r.json() : null)
+  .then(j => { TRY = j; if (cur) { fillSpot(); } })
+  .catch(() => {});
+const tryOf = id => (TRY && TRY.items && TRY.items[id] && TRY.items[id].front) ? TRY.items[id] : null;
+const onModel = it => want === 'model' && !!tryOf(it.id);
+function spotImg(it, v) {
+  const t = onModel(it) && tryOf(it.id);
+  if (!t) return img(it, v);
+  const b = v === 'back' && t.back;
+  return `<img class="mphoto" src="${b ? t.back : t.front}" alt="AI preview of the ${it.name} on our model, ${b ? 'back' : 'front'} view" draggable="false" decoding="async">`;
+}
+function syncSpotUI(it) {
+  const t = tryOf(it.id), m = onModel(it);
+  const w = $('#wear'); w.hidden = !TRY;
+  const mb = w.querySelector('[data-m="model"]');
+  mb.disabled = !t;
+  mb.innerHTML = t ? 'On model' : 'On model <span class="soon">· coming soon</span>';
+  w.querySelectorAll('button').forEach(b => b.classList.toggle('on', b.dataset.m === (m ? 'model' : 'hanger')));
+  spot.classList.toggle('model', m);
+  $('#aiBadge').hidden = !m;
+  const hasBack = m ? !!t.back : it.back;
+  $('#fb').hidden = !hasBack;
+  if (!hasBack) view = 'front';
+  document.querySelectorAll('#fb button').forEach(b => b.classList.toggle('on', b.dataset.v === view));
+  $('#aiNote').textContent = !m ? ''
+    : (view === 'back' && t.backFrom === 'ai') ? 'Back view imagined by AI — no back photo of this piece yet.'
+    : 'AI preview on our model — the real garment may vary slightly.';
+  if (t) [t.front, t.back].filter(Boolean).forEach(s => { const p = new Image(); p.src = s; });
+}
+function setMode(m) {
+  const it = byId(cur);
+  if (m === 'model' && !tryOf(it.id)) return;
+  if (m === want && (m === 'hanger' || onModel(it))) return;
+  want = m;
+  syncSpotUI(it);
+  swapTo(spotImg(it, view));
+}
+
 function setSource(el) {
   if (src) src.classList.remove('lifted');
   src = el; if (src) src.classList.add('lifted');
@@ -460,17 +519,16 @@ function sourceFor(id) {
 }
 function fillSpot() {
   const it = byId(cur), L = list();
-  spotFlip.innerHTML = img(it, view);
+  syncSpotUI(it);
+  spotFlip.innerHTML = spotImg(it, view);
   spot.style.setProperty('--tile', it.tile);
   spotG.style.setProperty('--s', it.s);
-  $('#fb').hidden = !it.back;
   if (it.back) { const pre = new Image(); pre.src = `img/${it.id}-back.webp`; }
   spot.style.setProperty('--accent', it.base);
   $('#spotCat').textContent = catLabel(it);
   $('#spotName').textContent = it.name;
   $('#spotPrice').textContent = fmt(it.price);
   $('#spotCount').textContent = `${L.findIndex(x => x.id === cur) + 1} / ${L.length}`;
-  document.querySelectorAll('#fb button').forEach(b => b.classList.toggle('on', b.dataset.v === view));
   $('#sizes').innerHTML = SIZES[it.cat].map(s => `<button data-s="${s}">${s}</button>`).join('');
   $('#sizeHint').textContent = '';
   const add = $('#addBtn'); add.textContent = 'Add to bag'; add.classList.remove('done');
@@ -484,7 +542,7 @@ function rectTransform(a, b) {
   return `translate(${dx}px,${dy}px) scale(${s})`;
 }
 function openSpot(id, el, kind) {
-  cur = id; srcKind = kind; view = 'front'; size = null;
+  cur = id; srcKind = kind; view = 'front'; size = null; want = 'hanger';
   fillSpot();
   spot.hidden = false; spot.scrollTop = 0;
   document.body.classList.add('lock');
@@ -508,7 +566,7 @@ function closeSpot() {
     document.body.classList.remove('lock');
   };
   const vis = el && (() => { const r = el.getBoundingClientRect(); return r.bottom > 0 && r.top < innerHeight && r.right > 0 && r.left < innerWidth; })();
-  if (el && vis && !reduce) {
+  if (el && vis && !reduce && !spot.classList.contains('model')) {
     const a = el.getBoundingClientRect(), b = spotG.getBoundingClientRect();
     const anim = spotG.animate([{transform: 'none'}, {transform: rectTransform(a, b)}], {duration: 520, easing: 'cubic-bezier(.5,0,.25,1)', fill: 'forwards'});
     anim.onfinish = () => { done(); anim.cancel(); };
@@ -538,12 +596,16 @@ function step(dir) {
 function setView(v) {
   if (v === view) return;
   view = v;
-  document.querySelectorAll('#fb button').forEach(b => b.classList.toggle('on', b.dataset.v === view));
   const it = byId(cur);
-  if (reduce) { spotFlip.innerHTML = img(it, view); return; }
+  syncSpotUI(it);
+  swapTo(spotImg(it, view));
+}
+// swap the picture in the spotlight with a top-down wipe
+function swapTo(html) {
+  if (reduce) { spotFlip.innerHTML = html; return; }
   spotFlip.getAnimations({subtree: true}).filter(a => a.id === 'wipe').forEach(a => a.finish());
   const old = spotFlip.querySelector('img');
-  spotFlip.insertAdjacentHTML('beforeend', img(it, view));
+  spotFlip.insertAdjacentHTML('beforeend', html);
   const nu = spotFlip.lastElementChild; nu.classList.add('wipe-in');
   const run = () => {
     const an = nu.animate([{clipPath: 'inset(0 0 100% 0)'}, {clipPath: 'inset(0 0 0% 0)'}], {duration: 700, easing: 'cubic-bezier(.65,0,.25,1)', id: 'wipe'});
@@ -557,6 +619,7 @@ $('#spotBg').onclick = closeSpot;
 $('#spotPrev').onclick = () => step(-1);
 $('#spotNext').onclick = () => step(1);
 $('#fb').addEventListener('click', e => { const b = e.target.closest('button'); if (b) setView(b.dataset.v); });
+$('#wear').addEventListener('click', e => { const b = e.target.closest('button'); if (b && !b.disabled) setMode(b.dataset.m); });
 $('#sizes').addEventListener('click', e => {
   const b = e.target.closest('button'); if (!b) return;
   size = b.dataset.s;
@@ -584,7 +647,7 @@ let tx = null;
 spot.addEventListener('touchstart', e => { tx = e.touches[0].clientX; }, {passive: true});
 spot.addEventListener('touchend', e => {
   if (tx === null) return; const dx = e.changedTouches[0].clientX - tx; tx = null;
-  if (Math.abs(dx) > 60 && !e.target.closest('.sizes,.fb,.details')) step(dx < 0 ? 1 : -1);
+  if (Math.abs(dx) > 60 && !e.target.closest('.sizes,.fb,.wear,.details')) step(dx < 0 ? 1 : -1);
 });
 document.addEventListener('keydown', e => {
   if ($('#bag').classList.contains('open')) { if (e.key === 'Escape') closeBag(); return; }
