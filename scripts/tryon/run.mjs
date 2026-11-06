@@ -183,7 +183,15 @@ async function main() {
   await fs.mkdir(MODELS_DIR, {recursive: true});
   let manifest = {models: {}, items: {}};
   try { manifest = {...manifest, ...JSON.parse(await fs.readFile(MANIFEST, 'utf8'))}; } catch {}
-  const save = async () => { manifest.updated = new Date().toISOString(); await fs.writeFile(MANIFEST, JSON.stringify(manifest, null, 2) + '\n'); };
+  // only touch the file when something really changed, so idle runs don't redeploy the site
+  const strip = m => JSON.stringify({...m, updated: undefined});
+  let lastSaved = strip(manifest);
+  const save = async () => {
+    if (strip(manifest) === lastSaved) return;
+    manifest.updated = new Date().toISOString();
+    await fs.writeFile(MANIFEST, JSON.stringify(manifest, null, 2) + '\n');
+    lastSaved = strip(manifest);
+  };
 
   console.log(`AETHOL try-on robot · model: ${MOCK ? 'TEST MODE' : MODEL}`);
   const products = await readProducts();
